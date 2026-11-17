@@ -1,0 +1,19 @@
+[project]
+name = "aviso-vencimiento-bancario"
+version = "0.1.0"
+requires-python = ">=3.9"
+dependencies = [
+    "flask",
+    "pandas>=2.3.3",
+    "python-dotenv",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest",
+]

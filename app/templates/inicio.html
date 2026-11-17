@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block contenido %}
+<div class="card">
+    <h2>Cargar archivo de operaciones</h2>
+    <p>Seleccione el archivo Excel con la lista de operaciones bancarias. La aplicación detectará las operaciones que vencen en 7 días o en 1 día.</p>
+
+    <form method="POST" action="{{ url_for('main.cargar') }}" enctype="multipart/form-data">
+        <div style="margin-bottom: 1rem;">
+            <label for="archivo" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
+                Archivo Excel (.xlsx o .xls)
+            </label>
+            <input type="file" name="archivo" id="archivo" accept=".xlsx,.xls" required style="padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; width: 100%; max-width: 400px;">
+        </div>
+        <button type="submit" class="btn">Cargar y procesar</button>
+    </form>
+
+    <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #dee2e6; font-size: 0.9rem; color: #6c757d;">
+        <p><strong>Formato esperado:</strong> El archivo debe tener las columnas: N° Operación, Monto Original, Saldo Actual, Tasa Interés, Próximo Pago, Fecha Constitución, Fecha Definitivo.</p>
+        <p><strong>Nota:</strong> El banco se detecta automáticamente de las filas de sección. El monto de pago se toma de "Saldo Actual" y la fecha de vencimiento de "Próximo Pago".</p>
+    </div>
+</div>
+{% endblock %}

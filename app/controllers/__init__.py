@@ -1,0 +1,152 @@
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+import os
+import tempfile
+import uuid
+
+from app.services.r1_leer_excel import leer_excel_operaciones
+from app.services.r2_asignar_banco import asignar_bancos
+from app.services.r3_calcular_dias import calcular_dias_para_vencer
+from app.services.r4_filtrar_vencimientos import filtrar_operaciones_por_vencer
+from app.services.r5_extraer_monto import extraer_monto
+from app.services.r6_detectar_moneda import detectar_moneda
+from app.services.r7_reportar_fechas_invalidas import reportar_fechas_invalidas
+from app.services.r8_omitir_sin_numero import omitir_sin_numero_operacion
+from app.services.r10_envio_correo import DESTINATARIO_JEFE, preparar_aviso
+from app.services.r11_agente_ia import agente_ia_interpretar
+
+main_bp = Blueprint("main", __name__)
+
+
+@main_bp.route("/")
+def inicio():
+    """Pantalla principal con botón para cargar el archivo Excel."""
+    return render_template("inicio.html")
+
+
+@main_bp.route("/cargar", methods=["POST"])
+def cargar():
+    """Recibe el archivo Excel subido, lo procesa con todas las reglas de negocio
+    y guarda los resultados en la sesión para mostrarlos en la pantalla de resultados."""
+    if "archivo" not in request.files:
+        flash("No se seleccionó ningún archivo.", "error")
+        return redirect(url_for("inicio"))
+
+    archivo = request.files["archivo"]
+    if archivo.filename == "":
+        flash("No se seleccionó ningún archivo.", "error")
+        return redirect(url_for("inicio"))
+
+    if not archivo.filename.endswith((".xlsx", ".xls")):
+        flash("El archivo debe ser un Excel (.xlsx o .xls).", "error")
+        return redirect(url_for("inicio"))
+
+    # Guardar archivo temporalmente
+    tmp_dir = tempfile.gettempdir()
+    nombre_tmp = f"{uuid.uuid4().hex}_{archivo.filename}"
+    ruta_tmp = os.path.join(tmp_dir, nombre_tmp)
+    archivo.save(ruta_tmp)
+
+    try:
+        # R1: Leer Excel
+        filas = leer_excel_operaciones(ruta_tmp)
+
+        # R2: Asignar bancos de sección
+        filas = asignar_bancos(filas)
+
+        # R3: Calcular días para vencer
+        filas = calcular_dias_para_vencer(filas)
+
+        # R7: Separar filas con fechas inválidas
+        filas_validas, filas_error = reportar_fechas_invalidas(filas)
+
+        # R8: Omitir filas sin N° Operación
+        filas_validas = omitir_sin_numero_operacion(filas_validas)
+
+        # R4/R9: Filtrar solo operaciones a 7 días o 1 día
+        operaciones_para_aviso = filtrar_operaciones_por_vencer(filas_validas)
+
+        # R5: Extraer monto
+        operaciones_para_aviso = extraer_monto(operaciones_para_aviso)
+
+        # R6: Detectar moneda
+        operaciones_para_aviso = detectar_moneda(operaciones_para_aviso)
+
+        # R11: Agente de IA - interpretar y redactar mensajes
+        operaciones_finales = []
+        for op in operaciones_para_aviso:
+            contrato = agente_ia_interpretar(op)
+            operaciones_finales.append({
+                "banco": contrato["banco"],
+                "moneda": contrato["moneda"],
+                "monto": contrato["monto"],
+                "dias_para_vencer": contrato["dias_para_vencer"],
+                "tipo_alerta": contrato["tipo_alerta"],
+                "fecha_vencimiento": op.get("fecha_vencimiento", "no indicado"),
+                "mensaje_ia": contrato["mensaje"],
+            })
+
+        # Contadores
+        total_cargadas = len(filas)
+        contador_semana = sum(1 for op in operaciones_finales if op["tipo_alerta"] == "semana")
+        contador_dia = sum(1 for op in operaciones_finales if op["tipo_alerta"] == "dia")
+        contador_errores = len(filas_error)
+
+        # Guardar en sesión
+        session["operaciones"] = operaciones_finales
+        session["total_operaciones"] = total_cargadas
+        session["contador_semana"] = contador_semana
+        session["contador_dia"] = contador_dia
+        session["contador_errores"] = contador_errores
+        session["errores"] = [
+            f"Fila {i+1}: {e.get('motivo_error', 'Fecha inválida')}"
+            for i, e in enumerate(filas_error)
+        ]
+
+        flash(f"Archivo procesado. Se detectaron {len(operaciones_finales)} operación(es) por vencer.", "exito")
+
+    except Exception as e:
+        flash(f"Error al procesar el archivo: {str(e)}", "error")
+    finally:
+        # Limpiar archivo temporal
+        if os.path.exists(ruta_tmp):
+            os.remove(ruta_tmp)
+
+    return redirect(url_for("main.resultados"))
+
+
+@main_bp.route("/resultados")
+def resultados():
+    """Pantalla de resultados con tabla de operaciones por vencer."""
+    operaciones = session.get("operaciones", [])
+    total = session.get("total_operaciones", 0)
+    contador_semana = session.get("contador_semana", 0)
+    contador_dia = session.get("contador_dia", 0)
+    contador_errores = session.get("contador_errores", 0)
+    errores = session.get("errores", [])
+
+    return render_template(
+        "resultados.html",
+        operaciones=operaciones,
+        total_operaciones=total,
+        contador_semana=contador_semana,
+        contador_dia=contador_dia,
+        contador_errores=contador_errores,
+        errores=errores,
+    )
+
+
+@main_bp.route("/enviar-aviso", methods=["POST"])
+def enviar_aviso():
+    """Envía los avisos por correo al jefe."""
+    operaciones = session.get("operaciones", [])
+    if not operaciones:
+        flash("No hay operaciones para enviar.", "error")
+        return redirect(url_for("main.resultados"))
+
+    mensaje = preparar_aviso(operaciones)
+
+    # Aquí se integraría el envío real de correo SMTP
+    # Las credenciales SMTP se leen desde .env (r10_envio_correo.py)
+    flash(f"Aviso preparado para {DESTINATARIO_JEFE}. Configurar SMTP para envío real.", "exito")
+
+    return redirect(url_for("main.resultados"))

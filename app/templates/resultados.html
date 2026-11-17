@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block contenido %}
+<div class="card">
+    <h2>Operaciones por vencer</h2>
+
+    <div class="contadores">
+        <div class="contador">
+            <h3>Total cargadas</h3>
+            <div class="valor">{{ total_operaciones }}</div>
+        </div>
+        <div class="contador">
+            <h3>Por vencer (7 días)</h3>
+            <div class="valor amarillo">{{ contador_semana }}</div>
+        </div>
+        <div class="contador">
+            <h3>Vencen mañana (1 día)</h3>
+            <div class="valor rojo">{{ contador_dia }}</div>
+        </div>
+        <div class="contador">
+            <h3>Errores</h3>
+            <div class="valor rojo">{{ contador_errores }}</div>
+        </div>
+    </div>
+
+    {% if errores %}
+    <div class="flash-error">
+        <strong>Se encontraron errores en las siguientes filas:</strong>
+        <ul style="margin-top: 0.5rem; margin-left: 1.5rem;">
+            {% for error in errores %}
+                <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if operaciones %}
+    <div class="filtro">
+        <input type="text" id="buscar" placeholder="Buscar por banco, moneda, monto o días...">
+    </div>
+
+    <table id="tabla-operaciones">
+        <thead>
+            <tr>
+                <th>Prioridad</th>
+                <th>Banco</th>
+                <th>Moneda</th>
+                <th>Monto a pagar</th>
+                <th>Días para vencer</th>
+                <th>Fecha vencimiento</th>
+                <th>Acción</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for op in operaciones %}
+            <tr class="fila-operacion {{ 'alerta-semana' if op.tipo_alerta == 'semana' else 'alerta-dia' }}" data-banco="{{ op.banco | default('') }}" data-moneda="{{ op.moneda | default('') }}" data-monto="{{ op.monto | default('') }}" data-dias="{{ op.dias_para_vencer | default('') }}">
+                <td>
+                    {% if op.tipo_alerta == 'semana' %}
+                        <span style="color: #856404; font-weight: bold;">📅 ESTA SEMANA</span>
+                    {% else %}
+                        <span style="color: #721c24; font-weight: bold;">⚠️ VENCE MAÑANA</span>
+                    {% endif %}
+                </td>
+                <td>{{ op.banco }}</td>
+                <td>{{ op.moneda }}</td>
+                <td>
+                    {% if op.moneda == 'dólares' %}${% endif %}{{ op.monto }}
+                </td>
+                <td>{{ op.dias_para_vencer }}</td>
+                <td>{{ op.fecha_vencimiento }}</td>
+                <td>
+                    <button class="btn btn-secundario" onclick="verDetalle(this)">Detalle</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div id="detalle-registro" style="margin-top: 1.5rem; display: none; background: #f8f9fa; padding: 1rem; border-radius: 4px; border: 1px solid #dee2e6;">
+        <h3 style="margin-bottom: 0.5rem;">Detalle de la operación</h3>
+        <p id="detalle-contenido"></p>
+        <button class="btn btn-secundario" onclick="ocultarDetalle()">Cerrar</button>
+    </div>
+
+    <div style="margin-top: 1rem;">
+        <button class="btn btn-exito" onclick="enviarAvisos()">Enviar avisos al jefe</button>
+    </div>
+    {% else %}
+    <div class="flash-exito">
+        Sin vencimientos programados para mañana ni para la semana en curso.
+    </div>
+    {% endif %}
+</div>
+
+<script>
+function filtrarTabla() {
+    var input = document.getElementById('buscar');
+    var filtro = input.value.toLowerCase();
+    var filas = document.getElementsByClassName('fila-operacion');
+
+    for (var i = 0; i < filas.length; i++) {
+        var fila = filas[i];
+        var texto = fila.textContent || fila.innerText;
+        if (texto.toLowerCase().indexOf(filtro) > -1) {
+            fila.style.display = "";
+        } else {
+            fila.style.display = "none";
+        }
+    }
+}
+
+document.getElementById('buscar').addEventListener('keyup', filtrarTabla);
+
+function verDetalle(boton) {
+    var fila = boton.closest('tr');
+    var banco = fila.getAttribute('data-banco');
+    var moneda = fila.getAttribute('data-moneda');
+    var monto = fila.getAttribute('data-monto');
+    var dias = fila.getAttribute('data-dias');
+
+    var contenido = document.getElementById('detalle-contenido');
+    contenido.innerHTML = '<strong>Banco:</strong> ' + banco + '<br>' +
+                          '<strong>Moneda:</strong> ' + moneda + '<br>' +
+                          '<strong>Monto a pagar:</strong> ' + monto + '<br>' +
+                          '<strong>Días para vencer:</strong> ' + dias;
+
+    var detalle = document.getElementById('detalle-registro');
+    detalle.style.display = 'block';
+}
+
+function ocultarDetalle() {
+    document.getElementById('detalle-registro').style.display = 'none';
+}
+
+function enviarAvisos() {
+    if (confirm("¿Está seguro de que desea enviar los avisos a sandra.jimenez@montecillos.com?")) {
+        fetch('/enviar-aviso', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+        })
+        .then(response => response.ok ? window.location.reload() : alert('Error al enviar los avisos'))
+        .catch(error => alert('Error: ' + error));
+    }
+}
+</script>
+{% endblock %}
