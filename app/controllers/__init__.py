@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
+import hashlib
 import os
 import tempfile
 import uuid
@@ -27,6 +28,12 @@ def _credencial_configurada(nombre):
     if len(valor) >= 2 and valor[0] == valor[-1] and valor[0] in "\"'":
         valor = valor[1:-1].strip()
     return valor
+
+
+def _huella(valor):
+    """Primeros 8 caracteres del hash SHA-256, para comparar valores sin
+    exponerlos en pantalla."""
+    return hashlib.sha256(valor.encode("utf-8")).hexdigest()[:8] if valor else ""
 
 
 def requiere_login(f):
@@ -77,11 +84,17 @@ def login():
 def diagnostico():
     """Página temporal de diagnóstico: indica si el servidor ve las variables
     de entorno del login y si el despliegue nuevo ya está activo.
-    Nunca muestra los valores, solo si están definidas."""
+    Nunca muestra los valores, solo su longitud y una huella para comparar."""
+    usuario = _credencial_configurada("APP_USUARIO")
+    clave = _credencial_configurada("APP_CLAVE")
     return {
         "version": VERSION_DIAGNOSTICO,
-        "APP_USUARIO_configurada": bool(_credencial_configurada("APP_USUARIO")),
-        "APP_CLAVE_configurada": bool(_credencial_configurada("APP_CLAVE")),
+        "APP_USUARIO_configurada": bool(usuario),
+        "APP_CLAVE_configurada": bool(clave),
+        "APP_USUARIO_caracteres": len(usuario),
+        "APP_CLAVE_caracteres": len(clave),
+        "APP_USUARIO_huella": _huella(usuario),
+        "APP_CLAVE_huella": _huella(clave),
     }
 
 
