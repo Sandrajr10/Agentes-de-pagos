@@ -17,6 +17,8 @@ from app.services.r11_agente_ia import agente_ia_interpretar
 
 main_bp = Blueprint("main", __name__)
 
+VERSION_DIAGNOSTICO = "login-2"
+
 
 def _credencial_configurada(nombre):
     """Lee una credencial de las variables de entorno y descarta espacios o
@@ -54,8 +56,14 @@ def login():
                 "variables de entorno del servidor.",
                 flush=True,
             )
+            flash(
+                "El servidor no tiene configuradas las variables APP_USUARIO y "
+                "APP_CLAVE. Revisa el panel de Render.",
+                "error",
+            )
+            return render_template("login.html")
 
-        if usuario == usuario_valido and clave == clave_valida and usuario_valido:
+        if usuario == usuario_valido and clave == clave_valida:
             session["usuario_autenticado"] = True
             flash("Inicio de sesión exitoso.", "exito")
             return redirect(url_for("main.inicio"))
@@ -63,6 +71,18 @@ def login():
             flash("Usuario o contraseña incorrectos.", "error")
 
     return render_template("login.html")
+
+
+@main_bp.route("/diagnostico")
+def diagnostico():
+    """Página temporal de diagnóstico: indica si el servidor ve las variables
+    de entorno del login y si el despliegue nuevo ya está activo.
+    Nunca muestra los valores, solo si están definidas."""
+    return {
+        "version": VERSION_DIAGNOSTICO,
+        "APP_USUARIO_configurada": bool(_credencial_configurada("APP_USUARIO")),
+        "APP_CLAVE_configurada": bool(_credencial_configurada("APP_CLAVE")),
+    }
 
 
 @main_bp.route("/salir")
