@@ -18,6 +18,15 @@ from app.services.r11_agente_ia import agente_ia_interpretar
 main_bp = Blueprint("main", __name__)
 
 
+def _credencial_configurada(nombre):
+    """Lee una credencial de las variables de entorno y descarta espacios o
+    comillas que se agreguen por error al configurarla en el servidor."""
+    valor = os.environ.get(nombre, "").strip()
+    if len(valor) >= 2 and valor[0] == valor[-1] and valor[0] in "\"'":
+        valor = valor[1:-1].strip()
+    return valor
+
+
 def requiere_login(f):
     """Decorator que exige que el usuario haya iniciado sesión."""
     @wraps(f)
@@ -36,10 +45,17 @@ def login():
         usuario = request.form.get("usuario", "").strip()
         clave = request.form.get("clave", "").strip()
 
-        usuario_valido = os.environ.get("APP_USUARIO", "")
-        clave_valida = os.environ.get("APP_CLAVE", "")
+        usuario_valido = _credencial_configurada("APP_USUARIO")
+        clave_valida = _credencial_configurada("APP_CLAVE")
 
-        if usuario == usuario_valido and clave == clave_valida:
+        if not usuario_valido or not clave_valida:
+            print(
+                "[login] Falta configurar APP_USUARIO y/o APP_CLAVE en las "
+                "variables de entorno del servidor.",
+                flush=True,
+            )
+
+        if usuario == usuario_valido and clave == clave_valida and usuario_valido:
             session["usuario_autenticado"] = True
             flash("Inicio de sesión exitoso.", "exito")
             return redirect(url_for("main.inicio"))
