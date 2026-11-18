@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block contenido %}
+<div class="card" style="max-width: 400px; margin: 3rem auto;">
+    <h2>Iniciar sesión</h2>
+
+    <form method="POST" action="{{ url_for('main.login') }}">
+        <div style="margin-bottom: 1rem;">
+            <label for="usuario" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
+                Usuario
+            </label>
+            <input type="text" name="usuario" id="usuario" required
+                   style="padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; width: 100%;">
+        </div>
+        <div style="margin-bottom: 1rem;">
+            <label for="clave" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">
+                Contraseña
+            </label>
+            <input type="password" name="clave" id="clave" required
+                   style="padding: 0.5rem; border: 1px solid #ced4da; border-radius: 4px; width: 100%;">
+        </div>
+        <button type="submit" class="btn">Ingresar</button>
+    </form>
+</div>
+{% endblock %}

@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 import os
 import tempfile
 import uuid
+from functools import wraps
 
 from app.services.r1_leer_excel import leer_excel_operaciones
 from app.services.r2_asignar_banco import asignar_bancos
@@ -17,28 +18,69 @@ from app.services.r11_agente_ia import agente_ia_interpretar
 main_bp = Blueprint("main", __name__)
 
 
+def requiere_login(f):
+    """Decorator que exige que el usuario haya iniciado sesión."""
+    @wraps(f)
+    def decorada(*args, **kwargs):
+        if not session.get("usuario_autenticado"):
+            flash("Debe iniciar sesión para acceder.", "error")
+            return redirect(url_for("main.login"))
+        return f(*args, **kwargs)
+    return decorada
+
+
+@main_bp.route("/login", methods=["GET", "POST"])
+def login():
+    """Pantalla de login. Lee credenciales de variables de entorno."""
+    if request.method == "POST":
+        usuario = request.form.get("usuario", "").strip()
+        clave = request.form.get("clave", "").strip()
+
+        usuario_valido = os.environ.get("APP_USUARIO", "")
+        clave_valida = os.environ.get("APP_CLAVE", "")
+
+        if usuario == usuario_valido and clave == clave_valida:
+            session["usuario_autenticado"] = True
+            flash("Inicio de sesión exitoso.", "exito")
+            return redirect(url_for("main.inicio"))
+        else:
+            flash("Usuario o contraseña incorrectos.", "error")
+
+    return render_template("login.html")
+
+
+@main_bp.route("/salir")
+def salir():
+    """Cierra la sesión del usuario."""
+    session.pop("usuario_autenticado", None)
+    flash("Sesión cerrada.", "exito")
+    return redirect(url_for("main.login"))
+
+
 @main_bp.route("/")
+@requiere_login
 def inicio():
     """Pantalla principal con botón para cargar el archivo Excel."""
     return render_template("inicio.html")
 
 
 @main_bp.route("/cargar", methods=["POST"])
+@requiere_login
 def cargar():
     """Recibe el archivo Excel subido, lo procesa con todas las reglas de negocio
     y guarda los resultados en la sesión para mostrarlos en la pantalla de resultados."""
     if "archivo" not in request.files:
         flash("No se seleccionó ningún archivo.", "error")
-        return redirect(url_for("inicio"))
+        return redirect(url_for("main.inicio"))
 
     archivo = request.files["archivo"]
     if archivo.filename == "":
         flash("No se seleccionó ningún archivo.", "error")
-        return redirect(url_for("inicio"))
+        return redirect(url_for("main.inicio"))
 
     if not archivo.filename.endswith((".xlsx", ".xls")):
         flash("El archivo debe ser un Excel (.xlsx o .xls).", "error")
-        return redirect(url_for("inicio"))
+        return redirect(url_for("main.inicio"))
 
     # Guardar archivo temporalmente
     tmp_dir = tempfile.gettempdir()
@@ -115,6 +157,7 @@ def cargar():
 
 
 @main_bp.route("/resultados")
+@requiere_login
 def resultados():
     """Pantalla de resultados con tabla de operaciones por vencer."""
     operaciones = session.get("operaciones", [])
@@ -136,6 +179,7 @@ def resultados():
 
 
 @main_bp.route("/enviar-aviso", methods=["POST"])
+@requiere_login
 def enviar_aviso():
     """Envía los avisos por correo al jefe."""
     operaciones = session.get("operaciones", [])
