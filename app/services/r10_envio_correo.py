@@ -22,7 +22,7 @@ def obtener_configuracion_correo() -> dict:
         "servidor": os.environ.get("SMTP_SERVIDOR", ""),
         "puerto": int(os.environ.get("SMTP_PUERTO", "587")),
         "usuario": os.environ.get("SMTP_USUARIO", ""),
-        "contraseña": os.environ.get("SMTP_CONTRASEÑA", ""),
+        "contraseña": os.environ.get("SMTP_CONTRASENA", ""),
         "usar_tls": os.environ.get("SMTP_TLS", "true").lower() == "true",
         "destinatario": DESTINATARIO_JEFE,
     }
