@@ -15,6 +15,7 @@ from app.services.r8_omitir_sin_numero import omitir_sin_numero_operacion
 from app.services.r10_envio_correo import (
     DESTINATARIO_JEFE,
     correo_configurado,
+    describir_error,
     enviar_aviso_operacion,
     registrar_envio,
 )
@@ -263,7 +264,7 @@ def enviar_aviso():
             enviados += 1
         except Exception as e:
             if primer_error is None:
-                primer_error = str(e)[:200]
+                primer_error = describir_error(e)
             registrar_envio(
                 DESTINATARIO_JEFE,
                 operacion.get("banco", ""),

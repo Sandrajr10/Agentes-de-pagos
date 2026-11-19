@@ -184,3 +184,24 @@ def test_ruta_informa_fallos_de_envio(monkeypatch, tmp_path):
 
     assert "fallaron" in html
     assert "ERROR" in (tmp_path / "envios.log").read_text(encoding="utf-8")
+
+
+def test_explica_error_de_servidor_inexistente(monkeypatch, tmp_path):
+    """Un error de DNS se explica en pantalla en lenguaje sencillo."""
+    import socket
+
+    _configurar_entorno(monkeypatch)
+    monkeypatch.setattr(correo.smtplib, "SMTP", SMTPFalso)
+    monkeypatch.setattr(
+        SMTPFalso,
+        "error_al_enviar",
+        socket.gaierror(-2, "Name or service not known"),
+    )
+    monkeypatch.setenv("REGISTRO_ENVIOS", str(tmp_path / "envios.log"))
+
+    cliente = _cliente_con_operaciones()
+    respuesta = cliente.post("/enviar-aviso", follow_redirects=True)
+    html = respuesta.get_data(as_text=True)
+
+    assert "no se encontró el servidor de correo" in html
+    assert "SMTP_SERVIDOR" in html

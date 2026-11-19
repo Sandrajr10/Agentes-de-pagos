@@ -8,6 +8,7 @@ entorno (.env en local, variables de entorno en el servidor).
 
 import os
 import smtplib
+import socket
 from email.message import EmailMessage
 
 from dotenv import load_dotenv
@@ -144,6 +145,32 @@ def enviar_aviso_operacion(operacion: dict, config: dict | None = None) -> None:
         if config["contrasena"]:
             servidor.login(config["usuario"], config["contrasena"])
         servidor.send_message(mensaje)
+
+
+def describir_error(error: Exception) -> str:
+    """Traduce los errores de correo más comunes a un mensaje entendible."""
+    texto = str(error)
+    if isinstance(error, socket.gaierror) or "Name or service not known" in texto:
+        return (
+            "no se encontró el servidor de correo. Revise la variable "
+            "SMTP_SERVIDOR (por ejemplo smtp.office365.com)."
+        )
+    if isinstance(error, smtplib.SMTPAuthenticationError):
+        return (
+            "el servidor rechazó el usuario o la contraseña. Revise "
+            "SMTP_USUARIO y SMTP_CONTRASENA."
+        )
+    if isinstance(error, (smtplib.SMTPConnectError, ConnectionRefusedError)) or "Connection refused" in texto:
+        return (
+            "no se pudo conectar al servidor de correo. Revise SMTP_SERVIDOR "
+            "y SMTP_PUERTO."
+        )
+    if isinstance(error, (TimeoutError, socket.timeout)) or "timed out" in texto.lower():
+        return (
+            "el servidor de correo no respondió a tiempo. Revise SMTP_PUERTO "
+            "(587) o si su proveedor bloquea la conexión."
+        )
+    return texto[:200]
 
 
 def registrar_envio(destinatario: str, banco: str, tipo_alerta: str, exito: bool, detalle: str = "") -> None:
