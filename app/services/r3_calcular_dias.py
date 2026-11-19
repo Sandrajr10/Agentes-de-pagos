@@ -5,6 +5,8 @@ R3: Calcula los días entre la fecha actual y la columna `Próximo Pago`.
 
 from datetime import datetime, date
 
+from app.services.tiempo import hoy_en_costa_rica
+
 
 def _es_fecha_valida(valor) -> bool:
     """Determina si un valor es una fecha parseable y no un texto como 'OP-001'."""
@@ -103,7 +105,7 @@ def calcular_dias_para_vencer(filas: list[dict]) -> list[dict]:
             continue
 
         fila_nueva["fecha_vencimiento"] = fecha_parsed
-        hoy = date.today()
+        hoy = hoy_en_costa_rica()
         dias = (fecha_parsed - hoy).days
         fila_nueva["dias_para_vencer"] = dias
 

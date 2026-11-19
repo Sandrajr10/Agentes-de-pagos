@@ -22,6 +22,7 @@ from app.services.r5_extraer_monto import extraer_monto
 from app.services.r6_detectar_moneda import detectar_moneda
 from app.services.r7_reportar_fechas_invalidas import reportar_fechas_invalidas
 from app.services.r8_omitir_sin_numero import omitir_sin_numero_operacion
+from app.services.tiempo import hoy_en_costa_rica
 
 
 CABECERA = [
@@ -138,7 +139,7 @@ def test_detecta_moneda_por_simbolo_de_saldo_actual(tmp_path):
 def test_detecta_avisos_a_7_y_1_dia(tmp_path):
     """R4/R9: solo se avisa a 7 y a 1 día; vencidas y lejanas se ignoran."""
     ruta = tmp_path / "operaciones.xlsx"
-    hoy = date.today()
+    hoy = hoy_en_costa_rica()
     _crear_excel(
         ruta,
         [

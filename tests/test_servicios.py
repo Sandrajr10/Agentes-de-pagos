@@ -18,6 +18,7 @@ from app.services.r5_extraer_monto import extraer_monto
 from app.services.r6_detectar_moneda import detectar_moneda
 from app.services.r7_reportar_fechas_invalidas import reportar_fechas_invalidas
 from app.services.r8_omitir_sin_numero import omitir_sin_numero_operacion
+from app.services.tiempo import hoy_en_costa_rica
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +72,7 @@ def test_r2_asignar_banco_a_operaciones():
 
 def test_r3_calcular_dias_7_dias():
     """R3: Fecha en 7 días debe reportar 7 días restantes."""
-    hoy = date.today()
+    hoy = hoy_en_costa_rica()
     fecha_futura = hoy + timedelta(days=7)
     filas = [
         {"0": "OP-1", "1": "", "2": "", "3": "", "4": fecha_futura.strftime("%Y-%m-%d"), "5": "", "6": ""}
@@ -82,7 +83,7 @@ def test_r3_calcular_dias_7_dias():
 
 def test_r3_calcular_dias_1_dia():
     """R3: Fecha en 1 día debe reportar 1 día restante."""
-    hoy = date.today()
+    hoy = hoy_en_costa_rica()
     fecha_mañana = hoy + timedelta(days=1)
     filas = [
         {"0": "OP-1", "1": "", "2": "", "3": "", "4": fecha_mañana.strftime("%Y-%m-%d"), "5": "", "6": ""}
