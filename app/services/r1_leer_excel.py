@@ -4,29 +4,137 @@ R1: La app lee el archivo de operaciones en la carpeta insumos.
 """
 
 import os
+import unicodedata
 import pandas as pd
+
+# Nombres de las columnas definidas en AGENTS.md. Se buscan por texto del
+# encabezado para no depender de la posición exacta de cada columna.
+COLUMNAS_DEFINIDAS = {
+    "numero_operacion": ("operacion",),
+    "monto_original": ("monto original",),
+    "saldo_actual": ("saldo actual",),
+    "tasa_interes": ("tasa",),
+    "proximo_pago": ("proximo pago",),
+    "fecha_constitucion": ("constitucion",),
+    "fecha_definitivo": ("definitivo",),
+}
+
+
+def _normalizar(valor) -> str:
+    """Convierte un valor a texto en minúsculas, sin acentos ni espacios extra."""
+    texto = str(valor).strip().lower()
+    return "".join(
+        c for c in unicodedata.normalize("NFD", texto)
+        if unicodedata.category(c) != "Mn"
+    )
+
+
+def _detectar_columnas(fila: dict) -> dict | None:
+    """Identifica las columnas del archivo a partir de una fila de encabezado.
+
+    Devuelve un diccionario {nombre_definido: clave_de_columna} o None si la
+    fila no es un encabezado válido (debe tener Próximo Pago y Saldo Actual).
+    """
+    columnas = {}
+    for clave, valor in fila.items():
+        texto = _normalizar(valor)
+        if not texto:
+            continue
+        for nombre, patrones in COLUMNAS_DEFINIDAS.items():
+            if nombre in columnas:
+                continue
+            if any(patron in texto for patron in patrones):
+                columnas[nombre] = clave
+                break
+
+    if "proximo_pago" in columnas and "saldo_actual" in columnas:
+        return columnas
+    return None
+
+
+def _es_fila_de_titulo(fila: dict) -> bool:
+    """Indica si la fila solo tiene texto en la primera columna y el resto vacío."""
+    valores = list(fila.values())
+    if not valores:
+        return False
+    return str(valores[0]).strip() != "" and all(str(v).strip() == "" for v in valores[1:])
+
+
+def _leer_hoja(df) -> list[dict]:
+    """Convierte una hoja de pandas en filas con las columnas ya identificadas."""
+    crudas = [
+        {str(col): ("" if pd.isna(val) else val) for col, val in row.items()}
+        for _, row in df.iterrows()
+    ]
+
+    indice_encabezado = None
+    columnas = None
+    for i, fila in enumerate(crudas):
+        detectadas = _detectar_columnas(fila)
+        if detectadas:
+            indice_encabezado = i
+            columnas = detectadas
+            break
+
+    filas = []
+    for i, fila in enumerate(crudas):
+        if indice_encabezado is not None:
+            # No procesar la fila de encabezado
+            if i == indice_encabezado:
+                continue
+            # El texto que está justo encima del encabezado es un subtítulo,
+            # no un nombre de banco.
+            if i == indice_encabezado - 1 and _es_fila_de_titulo(fila):
+                continue
+            # Agregar los nombres de columna definidos en AGENTS.md
+            if i > indice_encabezado:
+                for nombre, clave in columnas.items():
+                    fila[nombre] = fila.get(clave, "")
+
+        filas.append(fila)
+
+    return filas
 
 
 def leer_excel_operaciones(ruta_archivo: str) -> list[dict]:
     """Lee el archivo Excel de operaciones y devuelve una lista de diccionarios
     con las filas crudas del archivo.
 
+    Busca la hoja que contenga el encabezado con las columnas definidas
+    (Próximo Pago y Saldo Actual). Si ninguna lo tiene, usa la primera hoja.
+
     Args:
         ruta_archivo: Ruta al archivo .xlsx o .xls
 
     Returns:
-        Lista de diccionarios, uno por fila, con las columnas originales.
-        Si el archivo no existe o no se puede leer, devuelve lista vacía.
+        Lista de diccionarios, uno por fila. Las filas de operación traen
+        además las claves 'numero_operacion', 'saldo_actual', 'proximo_pago',
+        etc. Si el archivo no existe o no se puede leer, devuelve lista vacía.
     """
     if not os.path.exists(ruta_archivo):
         return []
 
     try:
-        df = pd.read_excel(ruta_archivo, header=None)
-        filas = []
-        for _, row in df.iterrows():
-            fila = {str(col): ("" if pd.isna(val) else val) for col, val in row.items()}
-            filas.append(fila)
-        return filas
-    except Exception:
+        with pd.ExcelFile(ruta_archivo) as xls:
+            hojas = list(xls.sheet_names)
+
+            hoja_elegida = None
+            for nombre_hoja in hojas:
+                df = pd.read_excel(xls, sheet_name=nombre_hoja, header=None, nrows=40)
+                for _, row in df.iterrows():
+                    fila = {str(col): ("" if pd.isna(val) else val) for col, val in row.items()}
+                    if _detectar_columnas(fila):
+                        hoja_elegida = nombre_hoja
+                        break
+                if hoja_elegida is not None:
+                    break
+
+            if hoja_elegida is None:
+                hoja_elegida = hojas[0]
+
+            df = pd.read_excel(xls, sheet_name=hoja_elegida, header=None)
+
+        return _leer_hoja(df)
+    except Exception as e:
+        print(f"[R1] No se pudo leer el Excel '{ruta_archivo}': {e}", flush=True)
         return []

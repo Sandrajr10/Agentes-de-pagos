@@ -24,12 +24,13 @@ def detectar_moneda(filas: list[dict]) -> list[dict]:
         fila_nueva["moneda"] = "colones"  # valor por defecto
 
         # Buscar el valor original de Saldo Actual para revisar el símbolo
-        monto_original = None
-        for clave, valor in fila.items():
-            clave_lower = str(clave).lower()
-            if "saldo" in clave_lower or "monto" in clave_lower or "cuota" in clave_lower:
-                monto_original = valor
-                break
+        monto_original = fila.get("saldo_actual") if "saldo_actual" in fila else None
+        if monto_original is None:
+            for clave, valor in fila.items():
+                clave_lower = str(clave).lower()
+                if "saldo" in clave_lower or "monto" in clave_lower or "cuota" in clave_lower:
+                    monto_original = valor
+                    break
 
         # Si no se encontró por nombre, buscar cualquier valor que tenga "$" o "₡"
         if monto_original is None:

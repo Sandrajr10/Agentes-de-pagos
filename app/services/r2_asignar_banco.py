@@ -28,8 +28,11 @@ def asignar_bancos(filas: list[dict]) -> list[dict]:
         if all(str(v).strip() == "" for v in fila.values()):
             continue
 
-        primera_columna = list(fila.values())[0] if fila else ""
-        otras_columnas = list(fila.values())[1:]
+        # Solo las columnas originales del Excel (claves numéricas) cuentan
+        # para saber si la fila trae datos o es solo un nombre de banco.
+        claves_numericas = [k for k in fila.keys() if str(k).isdigit()]
+        primera_columna = fila.get("0", "")
+        otras_columnas = [fila[k] for k in claves_numericas if str(k) != "0"]
 
         # Es fila de sección si: primera columna tiene texto y el resto está vacía
         es_seccion = (

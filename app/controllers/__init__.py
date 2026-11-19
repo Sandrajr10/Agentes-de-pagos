@@ -30,6 +30,18 @@ def _credencial_configurada(nombre):
     return valor
 
 
+def _contar_operaciones(filas):
+    """Cuenta las filas que son operaciones (tienen N° Operación)."""
+    total = 0
+    for fila in filas:
+        if fila.get("es_seccion"):
+            continue
+        numero = fila.get("numero_operacion", fila.get("0", ""))
+        if str(numero).strip() != "":
+            total += 1
+    return total
+
+
 def _huella(valor):
     """Primeros 8 caracteres del hash SHA-256, para comparar valores sin
     exponerlos en pantalla."""
@@ -141,6 +153,14 @@ def cargar():
         # R1: Leer Excel
         filas = leer_excel_operaciones(ruta_tmp)
 
+        if not filas:
+            flash(
+                "No se pudo leer el archivo o no contiene operaciones. "
+                "Verifique que sea un Excel válido.",
+                "error",
+            )
+            return redirect(url_for("main.inicio"))
+
         # R2: Asignar bancos de sección
         filas = asignar_bancos(filas)
 
@@ -166,18 +186,21 @@ def cargar():
         operaciones_finales = []
         for op in operaciones_para_aviso:
             contrato = agente_ia_interpretar(op)
+            fecha = op.get("fecha_vencimiento")
+            if hasattr(fecha, "strftime"):
+                fecha = fecha.strftime("%d/%m/%Y")
             operaciones_finales.append({
                 "banco": contrato["banco"],
                 "moneda": contrato["moneda"],
                 "monto": contrato["monto"],
                 "dias_para_vencer": contrato["dias_para_vencer"],
                 "tipo_alerta": contrato["tipo_alerta"],
-                "fecha_vencimiento": op.get("fecha_vencimiento", "no indicado"),
+                "fecha_vencimiento": fecha if fecha else "no indicado",
                 "mensaje_ia": contrato["mensaje"],
             })
 
         # Contadores
-        total_cargadas = len(filas)
+        total_cargadas = _contar_operaciones(filas)
         contador_semana = sum(1 for op in operaciones_finales if op["tipo_alerta"] == "semana")
         contador_dia = sum(1 for op in operaciones_finales if op["tipo_alerta"] == "dia")
         contador_errores = len(filas_error)
@@ -198,9 +221,12 @@ def cargar():
     except Exception as e:
         flash(f"Error al procesar el archivo: {str(e)}", "error")
     finally:
-        # Limpiar archivo temporal
-        if os.path.exists(ruta_tmp):
-            os.remove(ruta_tmp)
+        # Limpiar archivo temporal (si el sistema lo permite)
+        try:
+            if os.path.exists(ruta_tmp):
+                os.remove(ruta_tmp)
+        except OSError:
+            pass
 
     return redirect(url_for("main.resultados"))
 

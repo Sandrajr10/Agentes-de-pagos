@@ -48,10 +48,13 @@ def _extraer_numero_monto(valor) -> float | None:
 def _buscar_valor_monto(fila: dict):
     """Busca el valor de monto en la fila.
 
-    Primero busca por nombres de columna que contengan 'saldo', 'monto' o 'cuota'.
-    Si no encuentra, busca por valor monetario en cualquier columna que no sea
-    obviamente texto (nombres de banco, códigos de operación, etc.).
+    Si la fila trae la columna 'saldo_actual' identificada desde el encabezado
+    del Excel, se usa esa columna (R5). Si no, busca por nombre de columna y,
+    como último recurso, por el primer valor monetario.
     """
+    if "saldo_actual" in fila:
+        return fila.get("saldo_actual")
+
     # Primero por nombre de columna
     for clave, valor in fila.items():
         clave_lower = str(clave).lower()

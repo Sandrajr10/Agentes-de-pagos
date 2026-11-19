@@ -47,9 +47,13 @@ def _parsear_fecha(valor):
 def _buscar_valor_fecha(fila: dict):
     """Busca el valor de fecha en la fila.
 
-    Primero busca por nombres de columna que contengan 'pago', 'vencimiento',
-    'fecha' o 'proximo'. Si no encuentra, busca por valor que sea una fecha válida.
+    Si la fila trae la columna 'proximo_pago' identificada desde el encabezado
+    del Excel, se usa esa columna y ninguna otra. Si no, busca por nombre de
+    columna y, como último recurso, por valor que sea una fecha válida.
     """
+    if "proximo_pago" in fila:
+        return fila.get("proximo_pago")
+
     # Primero por nombre de columna
     for clave, valor in fila.items():
         clave_lower = str(clave).lower()
