@@ -24,6 +24,7 @@ Aplicación web que avisa por correo electrónico al jefe cuándo una operación
 - Algunas filas tienen `N° Operación` vacío.
 - Columnas `Monto Original`, `Tasa Interés`, `Fecha Constitución`, `Fecha Definitivo` y `Monto cancelar` están presentes pero se ignoran para este proceso.
 - Los días se calculan con la fecha de Costa Rica, no con la del servidor (UTC).
+- El archivo con las operaciones reales **no se guarda en GitHub** (está en `.gitignore`); se sube desde la pantalla principal o se deja en la carpeta `Insumos` de la computadora.
 
 ## Reglas de negocio (código, sin IA)
 
