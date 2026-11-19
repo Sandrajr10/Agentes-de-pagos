@@ -12,7 +12,12 @@ from app.services.r5_extraer_monto import extraer_monto
 from app.services.r6_detectar_moneda import detectar_moneda
 from app.services.r7_reportar_fechas_invalidas import reportar_fechas_invalidas
 from app.services.r8_omitir_sin_numero import omitir_sin_numero_operacion
-from app.services.r10_envio_correo import DESTINATARIO_JEFE, preparar_aviso
+from app.services.r10_envio_correo import (
+    DESTINATARIO_JEFE,
+    correo_configurado,
+    enviar_aviso_operacion,
+    registrar_envio,
+)
 from app.services.r11_agente_ia import agente_ia_interpretar
 
 main_bp = Blueprint("main", __name__)
@@ -229,16 +234,49 @@ def resultados():
 @main_bp.route("/enviar-aviso", methods=["POST"])
 @requiere_login
 def enviar_aviso():
-    """Envía los avisos por correo al jefe."""
+    """Envía un correo por cada operación por vencer al jefe."""
     operaciones = session.get("operaciones", [])
     if not operaciones:
         flash("No hay operaciones para enviar.", "error")
         return redirect(url_for("main.resultados"))
 
-    mensaje = preparar_aviso(operaciones)
+    if not correo_configurado():
+        flash(
+            "El correo no está configurado. Defina SMTP_SERVIDOR, SMTP_USUARIO y "
+            "SMTP_CONTRASENA en las variables de entorno del servidor.",
+            "error",
+        )
+        return redirect(url_for("main.resultados"))
 
-    # Aquí se integraría el envío real de correo SMTP
-    # Las credenciales SMTP se leen desde .env (r10_envio_correo.py)
-    flash(f"Aviso preparado para {DESTINATARIO_JEFE}. Configurar SMTP para envío real.", "exito")
+    enviados = 0
+    fallidos = 0
+    for operacion in operaciones:
+        try:
+            enviar_aviso_operacion(operacion)
+            registrar_envio(
+                DESTINATARIO_JEFE,
+                operacion.get("banco", ""),
+                operacion.get("tipo_alerta", ""),
+                True,
+            )
+            enviados += 1
+        except Exception as e:
+            registrar_envio(
+                DESTINATARIO_JEFE,
+                operacion.get("banco", ""),
+                operacion.get("tipo_alerta", ""),
+                False,
+                str(e),
+            )
+            fallidos += 1
+
+    if fallidos == 0:
+        flash(f"Se enviaron {enviados} aviso(s) a {DESTINATARIO_JEFE}.", "exito")
+    else:
+        flash(
+            f"Se enviaron {enviados} aviso(s) y {fallidos} fallaron. "
+            "Revise el registro de envíos.",
+            "error",
+        )
 
     return redirect(url_for("main.resultados"))

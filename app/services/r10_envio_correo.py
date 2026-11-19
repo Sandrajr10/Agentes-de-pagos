@@ -1,10 +1,19 @@
 """Servicios de lógica de negocio - Regla R10
 
 R10: El destinatario de los avisos es sandra.jimenez@montecillos.com.
+
+El aviso se envía por SMTP con la configuración guardada en variables de
+entorno (.env en local, variables de entorno en el servidor).
 """
 
 import os
+import smtplib
+from email.message import EmailMessage
+
 from dotenv import load_dotenv
+
+from app.services.tiempo import ZONA_COSTA_RICA
+from datetime import datetime
 
 load_dotenv()
 
@@ -18,14 +27,26 @@ def obtener_configuracion_correo() -> dict:
         Diccionario con servidor, puerto, usuario, contraseña y uso_tls.
         Retorna valores vacíos si no están configurados.
     """
+    puerto = os.environ.get("SMTP_PUERTO", "587").strip()
+    try:
+        puerto = int(puerto)
+    except ValueError:
+        puerto = 587
+
     return {
-        "servidor": os.environ.get("SMTP_SERVIDOR", ""),
-        "puerto": int(os.environ.get("SMTP_PUERTO", "587")),
-        "usuario": os.environ.get("SMTP_USUARIO", ""),
-        "contraseña": os.environ.get("SMTP_CONTRASENA", ""),
-        "usar_tls": os.environ.get("SMTP_TLS", "true").lower() == "true",
+        "servidor": os.environ.get("SMTP_SERVIDOR", "").strip(),
+        "puerto": puerto,
+        "usuario": os.environ.get("SMTP_USUARIO", "").strip(),
+        "contrasena": os.environ.get("SMTP_CONTRASENA", "").strip(),
+        "usar_tls": os.environ.get("SMTP_TLS", "true").strip().lower() != "false",
         "destinatario": DESTINATARIO_JEFE,
     }
+
+
+def correo_configurado() -> bool:
+    """Indica si están definidos el servidor, el usuario y la contraseña."""
+    config = obtener_configuracion_correo()
+    return bool(config["servidor"] and config["usuario"] and config["contrasena"])
 
 
 def preparar_aviso(operaciones: list[dict]) -> str:
@@ -43,20 +64,110 @@ def preparar_aviso(operaciones: list[dict]) -> str:
 
     lineas = ["Avisos de vencimiento de operaciones bancarias:\n"]
     for op in operaciones:
-        banco = op.get("banco", "no indicado")
-        moneda = op.get("moneda", "no indicado")
-        monto = op.get("monto", "no indicado")
-        dias = op.get("dias_para_vencer", "no indicado")
-        tipo = op.get("tipo_alerta", "")
-
-        if tipo == "semana":
-            alerta = "ESTA SEMANA"
-        else:
-            alerta = "VENCE MAÑANA"
-
+        alerta = _texto_alerta(op)
         lineas.append(
-            f"- {alerta}: {banco} | {moneda} | Monto: {monto} | Días: {dias}"
+            f"- {alerta}: {op.get('banco', 'no indicado')} | {op.get('moneda', 'no indicado')} "
+            f"| Monto: {_formatear_monto(op)} | Días: {op.get('dias_para_vencer', 'no indicado')}"
         )
 
     lineas.append(f"\nDestinatario: {DESTINATARIO_JEFE}")
     return "\n".join(lineas)
+
+
+def _texto_alerta(operacion: dict) -> str:
+    """Texto de la alerta según los días que faltan."""
+    if operacion.get("tipo_alerta") == "semana":
+        return "ESTA SEMANA"
+    return "VENCE MAÑANA"
+
+
+def _formatear_monto(operacion: dict) -> str:
+    """Devuelve el monto con separador de miles y su símbolo."""
+    monto = operacion.get("monto")
+    moneda = operacion.get("moneda")
+    if not isinstance(monto, (int, float)):
+        return "no indicado"
+
+    simbolo = "$" if moneda == "dólares" else "₡"
+    return f"{simbolo}{monto:,.2f}"
+
+
+def _cuerpo_operacion(operacion: dict) -> str:
+    """Redacta el cuerpo del correo de una operación."""
+    banco = operacion.get("banco") or "no indicado"
+    moneda = operacion.get("moneda") or "no indicado"
+    dias = operacion.get("dias_para_vencer", "no indicado")
+    fecha = operacion.get("fecha_vencimiento") or "no indicado"
+    alerta = _texto_alerta(operacion)
+
+    return (
+        f"Aviso de vencimiento bancario\n\n"
+        f"Alerta: {alerta}\n"
+        f"Banco: {banco}\n"
+        f"Moneda: {moneda}\n"
+        f"Monto a pagar: {_formatear_monto(operacion)}\n"
+        f"Fecha de vencimiento: {fecha}\n"
+        f"Días para vencer: {dias}\n\n"
+        f"{operacion.get('mensaje_ia', '')}\n\n"
+        "Este aviso lo genera la aplicación de control de pagos. "
+        "La decisión de ejecutar el pago corresponde al jefe.\n"
+    )
+
+
+def enviar_aviso_operacion(operacion: dict, config: dict | None = None) -> None:
+    """Envía un correo de aviso por una operación al jefe.
+
+    Lanza una excepción si el correo no se puede enviar, para que el
+    controlador registre el error.
+
+    Args:
+        operacion: Diccionario con banco, moneda, monto, dias_para_vencer,
+                   tipo_alerta y fecha_vencimiento.
+        config: Configuración SMTP opcional (por defecto se lee del entorno).
+    """
+    config = config or obtener_configuracion_correo()
+    if not (config["servidor"] and config["usuario"]):
+        raise RuntimeError("La configuración de correo está incompleta.")
+
+    mensaje = EmailMessage()
+    mensaje["Subject"] = (
+        f"Aviso de vencimiento bancario - {operacion.get('banco', 'no indicado')} - "
+        f"{_texto_alerta(operacion).lower()}"
+    )
+    mensaje["From"] = config["usuario"]
+    mensaje["To"] = config["destinatario"]
+    mensaje.set_content(_cuerpo_operacion(operacion))
+
+    with smtplib.SMTP(config["servidor"], config["puerto"], timeout=30) as servidor:
+        if config["usar_tls"]:
+            servidor.starttls()
+        if config["contrasena"]:
+            servidor.login(config["usuario"], config["contrasena"])
+        servidor.send_message(mensaje)
+
+
+def registrar_envio(destinatario: str, banco: str, tipo_alerta: str, exito: bool, detalle: str = "") -> None:
+    """Anota el envío en el archivo de registro con fecha y hora.
+
+    El archivo se define con la variable REGISTRO_ENVIOS y por defecto es
+    registros/envios.log.
+    """
+    ruta = os.environ.get("REGISTRO_ENVIOS", "registros/envios.log")
+    ahora = datetime.now(ZONA_COSTA_RICA) if ZONA_COSTA_RICA else datetime.now()
+    estado = "ENVIADO" if exito else "ERROR"
+    detalle = f" | {detalle}" if detalle else ""
+    linea = (
+        f"{ahora:%Y-%m-%d %H:%M:%S} | {estado} | {destinatario} | "
+        f"{banco or 'no indicado'} | {tipo_alerta or 'no indicado'}{detalle}"
+    )
+
+    try:
+        carpeta = os.path.dirname(ruta)
+        if carpeta:
+            os.makedirs(carpeta, exist_ok=True)
+        with open(ruta, "a", encoding="utf-8") as archivo:
+            archivo.write(linea + "\n")
+    except OSError as e:
+        print(f"[registro] No se pudo escribir el registro de envíos: {e}", flush=True)
+
+    print(f"[correo] {linea}", flush=True)

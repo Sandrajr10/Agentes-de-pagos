@@ -17,3 +17,5 @@ dist/
 build/
 # Archivos con datos reales de operaciones (no se versionan)
 Insumos/
+# Registro de envíos de correo
+registros/
