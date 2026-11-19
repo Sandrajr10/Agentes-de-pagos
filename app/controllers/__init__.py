@@ -250,6 +250,7 @@ def enviar_aviso():
 
     enviados = 0
     fallidos = 0
+    primer_error = None
     for operacion in operaciones:
         try:
             enviar_aviso_operacion(operacion)
@@ -261,6 +262,8 @@ def enviar_aviso():
             )
             enviados += 1
         except Exception as e:
+            if primer_error is None:
+                primer_error = str(e)[:200]
             registrar_envio(
                 DESTINATARIO_JEFE,
                 operacion.get("banco", ""),
@@ -273,9 +276,10 @@ def enviar_aviso():
     if fallidos == 0:
         flash(f"Se enviaron {enviados} aviso(s) a {DESTINATARIO_JEFE}.", "exito")
     else:
+        detalle = f" Detalle: {primer_error}" if primer_error else ""
         flash(
             f"Se enviaron {enviados} aviso(s) y {fallidos} fallaron. "
-            "Revise el registro de envíos.",
+            f"Revise el registro de envíos.{detalle}",
             "error",
         )
 
