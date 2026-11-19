@@ -49,11 +49,13 @@ def asignar_bancos(filas: list[dict]) -> list[dict]:
                 "banco": banco_actual,
             })
         else:
-            # Es fila de operación
+            # Es fila de operación. Si la hoja trae una columna 'Banco', el
+            # banco viene en la propia fila; si no, se hereda de la sección.
+            banco_de_fila = str(fila.get("banco", "")).strip()
             resultado.append({
                 **fila,
                 "es_seccion": False,
-                "banco": banco_actual,
+                "banco": banco_de_fila or banco_actual,
             })
 
     return resultado

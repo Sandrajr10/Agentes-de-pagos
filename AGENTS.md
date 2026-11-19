@@ -9,15 +9,21 @@ Aplicación web que avisa por correo electrónico al jefe cuándo una operación
 | Archivo | Formato | Columnas / Campos |
 |---|---|---|
 | `Insumos\LISTA DE OPERACIONES2.xlsx` | Excel (.xlsx) | N° Operación, Monto Original, Saldo Actual, Tasa Interés, Próximo Pago, Fecha Constitución, Fecha Definitivo |
+| `Insumos\LISTA DE OPERACIONES2.xlsx` (hoja por banco) | Excel (.xlsx) | Banco, Fecha de apertura, Fecha de pago, Cuota, Monto cancelar, Vencimiento, Tasa |
 
 **Notas sobre el archivo de insumos:**
-- El banco no es una columna por fila; aparece en filas de sección (ej. "Banco Costa Rica", "SCOTIABANK", "BAC SAN JOSE") y debe asignarse a cada fila de operación que le sigue hasta que aparezca el siguiente banco.
-- El monto de pago es la columna **Saldo Actual**.
-- La fecha de vencimiento es la columna **Próximo Pago**.
-- La moneda se detecta por el símbolo en la columna de monto (Saldo Actual): "$" indica dólares, "₡" (sin símbolo de dólar) indica colones.
+- El libro puede traer varias hojas. La app usa la hoja con encabezado conocido que tenga la fecha de pago más reciente.
+- En el formato "hoja por banco" las equivalencias son: **Fecha de pago** = fecha de vencimiento; **Cuota** = monto a pagar; **Banco** = banco de la propia fila (no hay fila de sección); **Vencimiento** = fecha definitiva (se ignora).
+- En ese formato la columna **Banco** también sirve como identificador de la operación cuando no existe `N° Operación`.
+- Los montos pueden venir como texto con punto de miles y punto decimal (ej. `$8.635.70` son 8 635,70), con espacios como separador de miles o como número.
+- El banco no es una columna por fila en el formato de lista: aparece en filas de sección (ej. "Banco Costa Rica", "SCOTIABANK", "BAC SAN JOSE") y debe asignarse a cada fila de operación que le sigue hasta que aparezca el siguiente banco.
+- El monto de pago es la columna **Saldo Actual** (o **Cuota**).
+- La fecha de vencimiento es la columna **Próximo Pago** (o **Fecha de pago**).
+- La moneda se detecta por el símbolo en la columna de monto: "$" indica dólares, "₡" o sin símbolo de dólar indican colones.
 - Algunas filas tienen `Próximo Pago` como `--/--/----` (fecha inválida).
 - Algunas filas tienen `N° Operación` vacío.
-- Columnas `Monto Original`, `Tasa Interés`, `Fecha Constitución` y `Fecha Definitivo` están presentes pero se ignoran para este proceso.
+- Columnas `Monto Original`, `Tasa Interés`, `Fecha Constitución`, `Fecha Definitivo` y `Monto cancelar` están presentes pero se ignoran para este proceso.
+- Los días se calculan con la fecha de Costa Rica, no con la del servidor (UTC).
 
 ## Reglas de negocio (código, sin IA)
 

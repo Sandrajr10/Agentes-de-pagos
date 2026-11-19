@@ -6,18 +6,37 @@ R5: Extrae el monto a pagar de la columna `Saldo Actual`.
 import re
 
 
+def _limpiar_numero(texto: str) -> str:
+    """Convierte un monto con formato costarricense a un número simple.
+
+    Los archivos usan punto como separador de miles y también como decimal
+    ("$8.635.70" son 8 635,70), espacios o comas como separador de miles, y a
+    veces símbolos de moneda.
+    """
+    texto = texto.replace("\xa0", " ").replace("\u202f", " ")
+    texto = re.sub(r"[^0-9.,]", "", texto)
+    if "," in texto:
+        texto = texto.replace(",", "")
+
+    partes = texto.split(".")
+    if len(partes) == 1:
+        return texto
+
+    ultima = partes[-1]
+    resto = "".join(partes[:-1])
+    # "1.234.567" son un millón doscientos..., no 1.234567
+    if len(ultima) == 3 and len(partes) > 2:
+        return resto + ultima
+    return resto + "." + ultima
+
+
 def _es_valor_monetario(valor) -> bool:
     """Determina si un valor parece un monto monetario."""
     if isinstance(valor, (int, float)):
         return True
     if isinstance(valor, str):
-        s = valor.strip()
-        if s == "":
-            return False
-        # Quitar símbolos y separadores para verificar si queda un número
-        limpio = s.replace("$", "").replace("₡", "").replace(",", "").replace(" ", "")
-        limpio = re.sub(r"[^0-9.]", "", limpio)
-        if limpio == "" or limpio == ".":
+        limpio = _limpiar_numero(valor)
+        if limpio in ("", "."):
             return False
         try:
             float(limpio)
@@ -32,14 +51,11 @@ def _extraer_numero_monto(valor) -> float | None:
     if isinstance(valor, (int, float)):
         return float(valor)
     if isinstance(valor, str):
-        texto = valor.strip()
-        texto = texto.replace("$", "").replace("₡", "").replace("USD", "").replace("usd", "")
-        texto = texto.replace(",", "").replace(" ", "")
-        texto = re.sub(r"[^0-9.]", "", texto)
-        if texto == "" or texto == ".":
+        limpio = _limpiar_numero(valor)
+        if limpio in ("", "."):
             return None
         try:
-            return float(texto)
+            return float(limpio)
         except ValueError:
             return None
     return None
