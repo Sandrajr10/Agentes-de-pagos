@@ -9,6 +9,7 @@ entorno (.env en local, variables de entorno en el servidor).
 import os
 import smtplib
 import socket
+import tempfile
 from email.message import EmailMessage
 
 from dotenv import load_dotenv
@@ -173,13 +174,27 @@ def describir_error(error: Exception) -> str:
     return texto[:200]
 
 
+def _rutas_registro() -> list[str]:
+    """Rutas donde se intenta guardar el registro, en orden de preferencia.
+
+    La primera es la configurada con REGISTRO_ENVIOS (por ejemplo el disco de
+    Render montado en /var/data). Si no se puede escribir, se usa la carpeta
+    del proyecto y, de último, la carpeta temporal del sistema.
+    """
+    principal = os.environ.get("REGISTRO_ENVIOS", "").strip()
+    rutas = [principal] if principal else []
+    rutas.append(os.path.join("registros", "envios.log"))
+    rutas.append(os.path.join(tempfile.gettempdir(), "envios.log"))
+    return rutas
+
+
 def registrar_envio(destinatario: str, banco: str, tipo_alerta: str, exito: bool, detalle: str = "") -> None:
     """Anota el envío en el archivo de registro con fecha y hora.
 
     El archivo se define con la variable REGISTRO_ENVIOS y por defecto es
-    registros/envios.log.
+    registros/envios.log. Además siempre se escribe en la salida del servidor
+    para que quede en los Logs de Render.
     """
-    ruta = os.environ.get("REGISTRO_ENVIOS", "registros/envios.log")
     ahora = datetime.now(ZONA_COSTA_RICA) if ZONA_COSTA_RICA else datetime.now()
     estado = "ENVIADO" if exito else "ERROR"
     detalle = f" | {detalle}" if detalle else ""
@@ -188,13 +203,15 @@ def registrar_envio(destinatario: str, banco: str, tipo_alerta: str, exito: bool
         f"{banco or 'no indicado'} | {tipo_alerta or 'no indicado'}{detalle}"
     )
 
-    try:
-        carpeta = os.path.dirname(ruta)
-        if carpeta:
-            os.makedirs(carpeta, exist_ok=True)
-        with open(ruta, "a", encoding="utf-8") as archivo:
-            archivo.write(linea + "\n")
-    except OSError as e:
-        print(f"[registro] No se pudo escribir el registro de envíos: {e}", flush=True)
+    for ruta in _rutas_registro():
+        try:
+            carpeta = os.path.dirname(ruta)
+            if carpeta:
+                os.makedirs(carpeta, exist_ok=True)
+            with open(ruta, "a", encoding="utf-8") as archivo:
+                archivo.write(linea + "\n")
+            break
+        except OSError as e:
+            print(f"[registro] No se pudo escribir en '{ruta}': {e}", flush=True)
 
     print(f"[correo] {linea}", flush=True)

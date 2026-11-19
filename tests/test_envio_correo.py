@@ -171,6 +171,18 @@ def test_ruta_avisa_si_falta_configuracion(monkeypatch, tmp_path):
     assert SMTPFalso.mensajes == []
 
 
+def test_registro_usa_respaldo_si_la_ruta_falla(monkeypatch, tmp_path):
+    """Si la ruta configurada no se puede escribir, no se pierde el registro."""
+    archivo_bloqueado = tmp_path / "archivo.txt"
+    archivo_bloqueado.write_text("x", encoding="utf-8")
+    monkeypatch.setenv("REGISTRO_ENVIOS", str(archivo_bloqueado / "envios.log"))
+    monkeypatch.chdir(tmp_path)
+
+    correo.registrar_envio(DESTINATARIO, "BCR 6181708", "dia", True)
+
+    assert (tmp_path / "registros" / "envios.log").exists()
+
+
 def test_ruta_informa_fallos_de_envio(monkeypatch, tmp_path):
     """Si el servidor rechaza el correo, se avisa y se registra el error."""
     _configurar_entorno(monkeypatch)
