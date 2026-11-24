@@ -14,6 +14,7 @@ from email.message import EmailMessage
 
 from dotenv import load_dotenv
 
+from app.services.formatos import formato_monto
 from app.services.tiempo import ZONA_COSTA_RICA
 from datetime import datetime
 
@@ -51,6 +52,23 @@ def correo_configurado() -> bool:
     return bool(config["servidor"] and config["usuario"] and config["contrasena"])
 
 
+def probar_conexion_correo(config: dict | None = None) -> None:
+    """Prueba la conexión con el servidor de correo sin enviar ningún mensaje.
+
+    Se conecta, inicia TLS si está configurado y valida el usuario y la
+    contraseña. Lanza una excepción con el problema encontrado.
+    """
+    config = config or obtener_configuracion_correo()
+    if not (config["servidor"] and config["usuario"]):
+        raise RuntimeError("La configuración de correo está incompleta.")
+
+    with smtplib.SMTP(config["servidor"], config["puerto"], timeout=20) as servidor:
+        if config["usar_tls"]:
+            servidor.starttls()
+        if config["contrasena"]:
+            servidor.login(config["usuario"], config["contrasena"])
+
+
 def preparar_aviso(operaciones: list[dict]) -> str:
     """Prepara el contenido del mensaje de aviso para el jefe.
 
@@ -85,13 +103,7 @@ def _texto_alerta(operacion: dict) -> str:
 
 def _formatear_monto(operacion: dict) -> str:
     """Devuelve el monto con separador de miles y su símbolo."""
-    monto = operacion.get("monto")
-    moneda = operacion.get("moneda")
-    if not isinstance(monto, (int, float)):
-        return "no indicado"
-
-    simbolo = "$" if moneda == "dólares" else "₡"
-    return f"{simbolo}{monto:,.2f}"
+    return formato_monto(operacion.get("monto"), operacion.get("moneda"))
 
 
 def _cuerpo_operacion(operacion: dict) -> str:

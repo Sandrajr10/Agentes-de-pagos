@@ -53,7 +53,7 @@
         </thead>
         <tbody>
             {% for op in operaciones %}
-            <tr class="fila-operacion {{ 'alerta-semana' if op.tipo_alerta == 'semana' else 'alerta-dia' }}" data-banco="{{ op.banco | default('') }}" data-moneda="{{ op.moneda | default('') }}" data-monto="{{ op.monto | default('') }}" data-dias="{{ op.dias_para_vencer | default('') }}">
+            <tr class="fila-operacion {{ 'alerta-semana' if op.tipo_alerta == 'semana' else 'alerta-dia' }}" data-banco="{{ op.banco | default('') }}" data-moneda="{{ op.moneda | default('') }}" data-monto="{{ op.monto | formato_monto(op.moneda) }}" data-dias="{{ op.dias_para_vencer | default('') }}">
                 <td>
                     {% if op.tipo_alerta == 'semana' %}
                         <span style="color: #856404; font-weight: bold;">📅 ESTA SEMANA</span>
@@ -63,9 +63,7 @@
                 </td>
                 <td>{{ op.banco }}</td>
                 <td>{{ op.moneda }}</td>
-                <td>
-                    {% if op.moneda == 'dólares' %}${% endif %}{{ op.monto }}
-                </td>
+                <td class="monto">{{ op.monto | formato_monto(op.moneda) }}</td>
                 <td>{{ op.dias_para_vencer }}</td>
                 <td>{{ op.fecha_vencimiento }}</td>
                 <td>
@@ -82,8 +80,9 @@
         <button class="btn btn-secundario" onclick="ocultarDetalle()">Cerrar</button>
     </div>
 
-    <div style="margin-top: 1rem;">
+    <div style="margin-top: 1rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
         <button class="btn btn-exito" onclick="enviarAvisos()">Enviar avisos al jefe</button>
+        <button class="btn btn-secundario" onclick="probarCorreo()">Probar correo</button>
     </div>
     {% else %}
     <div class="flash-exito">
@@ -130,6 +129,17 @@ function verDetalle(boton) {
 
 function ocultarDetalle() {
     document.getElementById('detalle-registro').style.display = 'none';
+}
+
+function probarCorreo() {
+    fetch('/probar-correo', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+    })
+    .then(response => response.ok ? window.location.reload() : alert('No se pudo probar el correo'))
+    .catch(error => alert('Error: ' + error));
 }
 
 function enviarAvisos() {

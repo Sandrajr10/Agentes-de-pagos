@@ -17,6 +17,7 @@ from app.services.r10_envio_correo import (
     correo_configurado,
     describir_error,
     enviar_aviso_operacion,
+    probar_conexion_correo,
     registrar_envio,
 )
 from app.services.r11_agente_ia import agente_ia_interpretar
@@ -230,6 +231,30 @@ def resultados():
         contador_errores=contador_errores,
         errores=errores,
     )
+
+
+@main_bp.route("/probar-correo", methods=["POST"])
+@requiere_login
+def probar_correo():
+    """Prueba la conexión con el servidor de correo sin enviar mensajes."""
+    if not correo_configurado():
+        flash(
+            "El correo no está configurado. Defina SMTP_SERVIDOR, SMTP_USUARIO y "
+            "SMTP_CONTRASENA en las variables de entorno del servidor.",
+            "error",
+        )
+        return redirect(url_for("main.resultados"))
+
+    try:
+        probar_conexion_correo()
+        flash(
+            "Conexión de correo correcta: el servidor respondió y aceptó las credenciales.",
+            "exito",
+        )
+    except Exception as e:
+        flash(f"Falló la prueba de correo: {describir_error(e)}", "error")
+
+    return redirect(url_for("main.resultados"))
 
 
 @main_bp.route("/enviar-aviso", methods=["POST"])
