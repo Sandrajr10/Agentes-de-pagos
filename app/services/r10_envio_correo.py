@@ -23,6 +23,24 @@ load_dotenv()
 DESTINATARIO_JEFE = "sandra.jimenez@montecillos.com"
 
 
+def limpiar_servidor(valor: str) -> str:
+    """Deja solo el nombre del servidor SMTP.
+
+    Acepta valores escritos como dirección web y quita espacios, comillas,
+    el protocolo (https://), la ruta y el puerto. Así "https://smtp.office365.com/"
+    se convierte en "smtp.office365.com" y la conexión funciona igual.
+    """
+    servidor = (valor or "").strip().strip("\"'").strip()
+    if "://" in servidor:
+        servidor = servidor.split("://", 1)[1]
+    servidor = servidor.split("/", 1)[0]
+    if servidor.count(":") == 1:
+        host, posible_puerto = servidor.rsplit(":", 1)
+        if posible_puerto.isdigit():
+            servidor = host
+    return servidor.strip().strip(".").lower()
+
+
 def obtener_configuracion_correo() -> dict:
     """Obtiene la configuración SMTP desde variables de entorno (.env).
 
@@ -37,7 +55,7 @@ def obtener_configuracion_correo() -> dict:
         puerto = 587
 
     return {
-        "servidor": os.environ.get("SMTP_SERVIDOR", "").strip(),
+        "servidor": limpiar_servidor(os.environ.get("SMTP_SERVIDOR", "")),
         "puerto": puerto,
         "usuario": os.environ.get("SMTP_USUARIO", "").strip(),
         "contrasena": os.environ.get("SMTP_CONTRASENA", "").strip(),

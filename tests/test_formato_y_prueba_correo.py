@@ -102,6 +102,22 @@ def test_formato_monto_sin_dato():
     assert formato_monto(None, "colones") == "no indicado"
 
 
+@pytest.mark.parametrize(
+    "valor, esperado",
+    [
+        ("smtp.office365.com", "smtp.office365.com"),
+        ("https://smtp.office365.com", "smtp.office365.com"),
+        ("https://smtp.office365.com/", "smtp.office365.com"),
+        (" smtp.office365.com ", "smtp.office365.com"),
+        ("smtp.office365.com:587", "smtp.office365.com"),
+        ('"smtp.office365.com"', "smtp.office365.com"),
+        ("SMTP.Office365.com", "smtp.office365.com"),
+    ],
+)
+def test_limpiar_servidor(valor, esperado):
+    assert correo.limpiar_servidor(valor) == esperado
+
+
 def test_pantalla_muestra_montos_formateados():
     cliente = _cliente()
     html = cliente.get("/resultados").get_data(as_text=True)

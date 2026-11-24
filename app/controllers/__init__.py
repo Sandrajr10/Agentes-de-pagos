@@ -17,6 +17,7 @@ from app.services.r10_envio_correo import (
     correo_configurado,
     describir_error,
     enviar_aviso_operacion,
+    obtener_configuracion_correo,
     probar_conexion_correo,
     registrar_envio,
 )
@@ -252,7 +253,12 @@ def probar_correo():
             "exito",
         )
     except Exception as e:
-        flash(f"Falló la prueba de correo: {describir_error(e)}", "error")
+        config = obtener_configuracion_correo()
+        flash(
+            f"Falló la prueba de correo ({config['servidor']}:{config['puerto']}): "
+            f"{describir_error(e)}",
+            "error",
+        )
 
     return redirect(url_for("main.resultados"))
 
