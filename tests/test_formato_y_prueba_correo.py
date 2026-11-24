@@ -102,6 +102,15 @@ def test_formato_monto_sin_dato():
     assert formato_monto(None, "colones") == "no indicado"
 
 
+def test_describir_error_de_red_bloqueada():
+    error = OSError(101, "Network is unreachable")
+
+    mensaje = correo.describir_error(error)
+
+    assert "plan gratuito de Render" in mensaje
+    assert "25, 465 y 587" in mensaje
+
+
 @pytest.mark.parametrize(
     "valor, esperado",
     [

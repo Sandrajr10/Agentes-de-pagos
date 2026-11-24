@@ -197,6 +197,15 @@ def describir_error(error: Exception) -> str:
             "no se encontró el servidor de correo. Revise la variable "
             "SMTP_SERVIDOR (por ejemplo smtp.office365.com)."
         )
+    if (isinstance(error, OSError) and getattr(error, "errno", None) == 101) or (
+        "Network is unreachable" in texto
+    ):
+        return (
+            "el servidor donde está publicada la app no permite conectarse al "
+            "puerto de correo. El plan gratuito de Render bloquea los puertos "
+            "25, 465 y 587. Para enviar desde aquí hay que pasar a un plan "
+            "pagado o usar un servicio de correo por internet (API)."
+        )
     if isinstance(error, smtplib.SMTPAuthenticationError):
         return (
             "el servidor rechazó el usuario o la contraseña. Revise "
