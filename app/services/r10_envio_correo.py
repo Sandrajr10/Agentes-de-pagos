@@ -26,14 +26,25 @@ DESTINATARIO_JEFE = "sandra.jimenez@montecillos.com"
 def limpiar_servidor(valor: str) -> str:
     """Deja solo el nombre del servidor SMTP.
 
-    Acepta valores escritos como dirección web y quita espacios, comillas,
-    el protocolo (https://), la ruta y el puerto. Así "https://smtp.office365.com/"
-    se convierte en "smtp.office365.com" y la conexión funciona igual.
+    Acepta valores escritos como dirección web o con texto de más y quita
+    espacios, comillas, el nombre de la variable, el protocolo (https://), la
+    ruta y el puerto. Así "https://smtp.office365.com/" o
+    "servidor smtp.office365.com" se convierten en "smtp.office365.com".
     """
     servidor = (valor or "").strip().strip("\"'").strip()
+    if "=" in servidor:
+        servidor = servidor.split("=", 1)[1]
     if "://" in servidor:
         servidor = servidor.split("://", 1)[1]
-    servidor = servidor.split("/", 1)[0]
+    servidor = servidor.split("/", 1)[0].strip()
+
+    # Si quedó texto adicional, se toma la palabra que parece un servidor
+    # (tiene punto y no tiene espacios).
+    candidatos = [parte for parte in servidor.split() if "." in parte]
+    if candidatos:
+        servidor = candidatos[-1]
+
+    servidor = servidor.strip("\"'()").strip()
     if servidor.count(":") == 1:
         host, posible_puerto = servidor.rsplit(":", 1)
         if posible_puerto.isdigit():

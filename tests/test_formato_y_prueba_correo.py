@@ -112,6 +112,10 @@ def test_formato_monto_sin_dato():
         ("smtp.office365.com:587", "smtp.office365.com"),
         ('"smtp.office365.com"', "smtp.office365.com"),
         ("SMTP.Office365.com", "smtp.office365.com"),
+        ("servidor smtp.office365.com", "smtp.office365.com"),
+        ("SMTP_SERVIDOR=smtp.office365.com", "smtp.office365.com"),
+        ("servidor: smtp.office365.com:587", "smtp.office365.com"),
+        ("smtp.office365.com puerto 587", "smtp.office365.com"),
     ],
 )
 def test_limpiar_servidor(valor, esperado):
